@@ -8,7 +8,6 @@ python:
     - "3.6"
 env:
     - TOXENV=manifest
-    - TOXENV=docs
 
 matrix:
     include:
@@ -19,15 +18,8 @@ matrix:
     allow_failures:
         - python: "3.6"
 
-before_install:
-    - pip install codecov
-
 install:
     - pip install tox
 
 script:
     - tox
-
-after_success:
-    - tox -e coverage-report
-    - codecov
