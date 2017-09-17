@@ -10,6 +10,7 @@ import sys
 
 if sys.version_info.major == 3:
     from urllib.parse import urljoin
+    basestring = str
 else:
     from urlparse import urljoin
 
@@ -115,7 +116,10 @@ class Ndex:
         response.raise_for_status()
         if response.status_code == 204:
             return ""
-        return response.json()
+        if response.headers['content-type'] == 'application/json':
+            return response.json()
+        else :
+            return response.text
 
 
     def post(self, route, post_json):
@@ -124,7 +128,7 @@ class Ndex:
             print("POST route: " + url)
             print("POST json: " + post_json)
         headers = {'Content-Type': 'application/json',
-                   'Accept': 'application/json',
+                   'Accept': 'application/json,text/plain',
                    'Cache-Control': 'no-cache',
                    'User-Agent':  userAgent,
                    }
@@ -133,7 +137,10 @@ class Ndex:
         response.raise_for_status()
         if response.status_code == 204:
             return ""
-        return response.json()
+        if response.headers['content-type'] == 'application/json':
+            return response.json()
+        else :
+            return response.text
 
     def delete(self, route):
         url = self.host + route
@@ -320,6 +327,25 @@ class Ndex:
         route = ""
         if(self.version == "2.0"):
             route = "/network/%s" % (network_id)
+        else:
+            route = "/network/%s/asCX" % (network_id)
+
+        return self.get_stream(route)
+
+    # Get a CX stream for a aspect of a network
+    def get_network_aspect_as_cx_stream(self, network_id, aspect_name):
+        '''Get the specified aspect of the existing network with UUID network_id from the NDEx connection as a CX stream.
+
+        :param network_id: The UUID of the network.
+        :param aspect_name: The aspect NAME.
+        :type network_id: str
+        :return: The response.
+        :rtype: `response object <http://docs.python-requests.org/en/master/user/quickstart/#response-content>`_
+
+        '''
+        route = ""
+        if(self.version == "2.0"):
+            route = "/network/%s/aspect/%s" % (network_id, aspect_name)
         else:
             route = "/network/%s/asCX" % (network_id)
 
@@ -531,6 +557,18 @@ class Ndex:
             raise Exception("network_properties must be a string or a list of NdexPropertyValuePair objects")
         return self.put(route, putJson)
 
+
+    def get_sample_network(self, network_id):
+        route = "/network/%s/sample" % (network_id)
+        return self.get(route)
+
+
+    def set_network_sample(self, network_id, sample_cx_network_str):
+        self.require_auth()
+        route = "/network/%s/sample" % (network_id)
+    #    putJson = json.dumps(sample_cx_network_str)
+        return self.put(route, sample_cx_network_str)
+
     def set_network_system_properties(self, network_id, network_properties):
         self.require_auth()
         route = "/network/%s/systemproperty" % (network_id)
@@ -643,6 +681,15 @@ class Ndex:
     def update_status(self):
         route = "/admin/status"
         self.status = self.get(route)
+
+    # network set
+
+    def create_networkset (self, name, description):
+        route = "/networkset"
+        return self.post(route, json.dumps( { "name": name, "description": description}))
+
+
+
 
 
 

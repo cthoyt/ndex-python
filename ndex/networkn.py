@@ -9,6 +9,11 @@ from time import time
 from six import string_types
 import sys
 
+try:
+    basestring
+except:
+    basestring = str
+
 #NDEXGRAPH_RESERVED_ATTRIBUTES = [
 #    "subnetwork_id"
 #    "view_id",
@@ -141,7 +146,7 @@ class NdexGraph (MultiDiGraph):
             node_dict_x = {}
             self.max_edge_id = 0
             for node_name, node_attr in networkx_G.nodes_iter(data=True):
-                if node_attr.has_key('name'):
+                if 'name' in node_attr:
                     self.add_node(node_id_x, node_attr)
                 else:
                     self.add_node(node_id_x, node_attr, name=node_name)
@@ -171,7 +176,7 @@ class NdexGraph (MultiDiGraph):
             if not cx:
                 raise RuntimeError("Failed to retrieve network with uuid " + uuid + " from " + server)
             else:
-                metadata_temp = (item for item in cx if item.get("metaData") is not None).next()
+                metadata_temp = next((item for item in cx if item.get("metaData") is not None))
                 if(metadata_temp is not None):
                     self.metadata_original = metadata_temp["metaData"]
 
@@ -219,6 +224,7 @@ class NdexGraph (MultiDiGraph):
                         raise RuntimeError('@context aspect can only have one element')
                     else :
                         self.namespaces = elements[0]
+            # TODO elif if it's an aspect we want to keep out we put an elif for that aspect
             else:
                 self.unclassified_cx.append(aspect)
 
@@ -350,11 +356,23 @@ class NdexGraph (MultiDiGraph):
             elif 'edgeCitations' in aspect:
                 for edge_citation in aspect['edgeCitations']:
                     for edge in edge_citation["po"]:
-                        self.edge_citation_map[edge] = edge_citation["citations"]
+                        edge_citation_added = False
                         for citation_id in edge_citation["citations"]:
+                            citation_tmp = self.citation_map.get(citation_id)
+                            if citation_tmp is not None and isinstance(citation_tmp, dict):
+                                self.add_citation_to_edge(edge, citation_tmp.get('dc:identifier'))
+                                edge_citation_added = True
+                            if citation_tmp is not None and isinstance(citation_tmp, basestring):
+                                self.add_citation_to_edge(edge, citation_tmp)
+                                edge_citation_added = True
+
                             cit_ref = self.citation_reference_map.get(citation_id)
                             if(cit_ref is not None):
                                 self.citation_reference_map[citation_id] += 1
+
+                        if not edge_citation_added:
+                            self.edge_citation_map[edge] = edge_citation["citations"]
+
             elif 'nodeSupports' in aspect:
                 for node_support in aspect['nodeSupports']:
                     for node_sup_po in node_support["po"]:
@@ -377,8 +395,19 @@ class NdexGraph (MultiDiGraph):
             elif 'reifiedEdges' in aspect:
                 for reified_edge in aspect["reifiedEdges"]:
                     self.reified_edges [reified_edge['node']] = reified_edge
+            elif 'visualProperties' in aspect:
+                # remove all references to view id
+                for visual_properties in aspect["visualProperties"]:
+                    visual_properties.pop('view', None)
+                self.unclassified_cx.append(aspect)
+            elif 'cyVisualProperties' in aspect:
+                # remove all references to view id
+                for visual_properties in aspect["cyVisualProperties"]:
+                    visual_properties.pop('view', None)
+                self.unclassified_cx.append(aspect)
             else:
                 self.unclassified_cx.append(aspect)
+        print('')
 
     def networkx_to_NdexGraph(networkx_G):
         """Converts a NetworkX into a NdexGraph object"""
@@ -388,7 +417,7 @@ class NdexGraph (MultiDiGraph):
         node_dict = {}
         G.max_edge_id = 0
         for node_name, node_attr in networkx_G.nodes_iter(data=True):
-            if node_attr.has_key('name'):
+            if 'name' in node_attr:
                 G.add_node(node_id, node_attr)
             else:
                 G.add_node(node_id, node_attr, name=node_name)
@@ -400,8 +429,8 @@ class NdexGraph (MultiDiGraph):
 
         if hasattr(networkx_G, 'pos'):
             G.pos = {node_dict[a] : b for a, b in networkx_G.pos.items()}
-            G.subnetwork_id = 1
-            G.view_id = 1
+            #G.subnetwork_id = 1
+            #G.view_id = 1
 
         return G
 
@@ -626,6 +655,9 @@ class NdexGraph (MultiDiGraph):
         :return: The cx dictionary that represents this network.
         :rtype: dict
         """
+        self.subnetwork_id = None
+        self.view_id = None
+
         has_single_subnetwork = False
         if self.subnetwork_id and self.view_id:
             has_single_subnetwork = True
@@ -663,9 +695,10 @@ class NdexGraph (MultiDiGraph):
 
         if self.pos and len(self.pos):
             if has_single_subnetwork:
-                cx += ca.cartesian(G, self.view_id)
+                cx += ca.cartesian(G)#, self.view_id)
             else:
-                raise ValueError("NdexGraph positions (g.pos) set without setting view and subnetwork ids")
+                cx += ca.cartesian(G)
+                #raise ValueError("NdexGraph positions (g.pos) set without setting view and subnetwork ids")
 
         if len(self.citation_map) > 0:
             cx += ca.citations(G)
@@ -990,7 +1023,7 @@ class NdexGraph (MultiDiGraph):
         #===========================
         for asp in self.unclassified_cx:
             try:
-                aspect_type = asp.iterkeys().next()
+                aspect_type = next(iter(asp.keys()))
                 if(aspect_type == "visualProperties"
                    or aspect_type == "cyVisualProperties"
                    or aspect_type == "@context"):
@@ -1027,11 +1060,11 @@ class NdexGraph (MultiDiGraph):
             try:
                 return_bytes = io.BytesIO(json.dumps(cx))
             except UnicodeDecodeError as err1:
-                print "Detected invalid encoding. Trying latin-1 encoding."
+                print("Detected invalid encoding. Trying latin-1 encoding.")
                 return_bytes = io.BytesIO(json.dumps(cx, encoding="latin-1"))
-                print "Success"
+                print("Success")
             except Exception as err2:
-                print err2.message
+                print(err2.message)
 
             return return_bytes
 
@@ -1158,7 +1191,7 @@ class NdexGraph (MultiDiGraph):
     def remove_citation_and_support_node_references(self, node_id):
 
         # remove support to edge references
-        if self.node_support_map.has_key(node_id):
+        if node_id in self.node_support_map:
             # get the supports that reference the edge
             support_ids = self.node_support_map[node_id]
             # remove the edge entry from the edge_support_map
@@ -1182,7 +1215,7 @@ class NdexGraph (MultiDiGraph):
 
 
         # remove support to edge references
-        if self.node_citation_map.has_key(node_id):
+        if node_id in self.node_citation_map:
             #=====================================================
             # Check the "citations" reference map. Decrement the
             # reference value and if it reaches 0 remove from map
@@ -1301,7 +1334,7 @@ class NdexGraph (MultiDiGraph):
         """
         keys = set()
         for _, attributes in self.nodes_iter(data=True):
-            for key, value in attributes.iteritems():
+            for key, value in attributes.items():
                 keys.add(key)
         return list(keys)
 
@@ -1325,7 +1358,7 @@ class NdexGraph (MultiDiGraph):
         for s in source_node_ids:
             for t in target_node_ids:
                 if s in self and t in self[s]:
-                    edge_keys += self[s][t].keys()
+                    edge_keys += list(self[s][t].keys())
         return edge_keys
 
     def add_edge_between(self, source_node_id, target_node_id, interaction='interacts_with', attr_dict=None, **attr):
@@ -1370,7 +1403,7 @@ class NdexGraph (MultiDiGraph):
         self.edgemap.pop(edge_id, None)
         pop_these_reified_edges = []
 
-        for n,re in self.reified_edges.iteritems():
+        for n,re in self.reified_edges.items():
             if(re["edge"] == edge_id):
                 pop_these_reified_edges.append(n)
                 # This causes problems when editing the dictionary while iterating over it --> self.reified_edges.pop(n,None)
@@ -1392,7 +1425,7 @@ class NdexGraph (MultiDiGraph):
         support_ids = None
 
         # remove support to edge references
-        if self.edge_support_map.has_key(edge_id):
+        if edge_id in self.edge_support_map:
             # get the supports that reference the edge
             support_ids = self.edge_support_map[edge_id]
             # remove the edge entry from the edge_support_map
@@ -1416,7 +1449,7 @@ class NdexGraph (MultiDiGraph):
 
 
         # remove support to edge references
-        if self.edge_citation_map.has_key(edge_id):
+        if edge_id in self.edge_citation_map:
             #=====================================================
             # Check the "citations" reference map. Decrement the
             # reference value and if it reaches 0 remove from map
@@ -1556,7 +1589,7 @@ class NdexGraph (MultiDiGraph):
             raise ValueError("the attribute name " + str(attribute_key) + " is not used ANYWHERE in the network.")
         
         return [self[v[0]][v[1]][k][attribute_key] if attribute_key in self[v[0]][v[1]][k] else None for k, v in
-                edge_keys.iteritems()]
+                edge_keys.items()]
 
     def get_all_edge_attribute_keys(self):
         """Get the unique list of all attribute keys used in at least one edge in the network.
@@ -1567,7 +1600,7 @@ class NdexGraph (MultiDiGraph):
         """
         keys = set()
         for _, _, attributes in self.edges_iter(data=True):
-            for key, value in attributes.iteritems():
+            for key, value in attributes.items():
                 keys.add(key)
         return list(keys)
 
@@ -1606,7 +1639,23 @@ class NdexGraph (MultiDiGraph):
             citation_ids = [citation_id]
             self.node_citation_map[node_id] = citation_ids
 
-    def add_edge_citation_ref(self, edge_id, citation_id):
+    def add_citation_to_edge(self, edge_id, citation_string):
+        #TODO check edge attriutes for ndex:citation.  Add list if not exist otherwise append.  No duplicates
+        #self.set_edge_attribute(edge_id, 'ndex:citation', citation_string)
+
+        source_id, target_id = self.get_node_ids_by_edge_id(edge_id)
+        if self.edge[source_id][target_id][edge_id].get('ndex:citation') is None:
+            self.edge[source_id][target_id][edge_id]['ndex:citation'] = [citation_string]
+        else:
+            self.edge[source_id][target_id][edge_id]['ndex:citation'].append(citation_string)
+
+
+    def add_edge_citation_ref(self, edge_id, citation_id, override=None):
+        if override is None:
+            raise Exception("This method has been deprecated because it is incompatible with Cytoscape. "
+                            "Use add_citation_to_edge() instead. You can still use this method if you set "
+                            "override=True in the parameters.")
+
         if edge_id in self.edge_citation_map:
             citation_ids = self.edge_citation_map[edge_id]
             if citation_id not in citation_ids:

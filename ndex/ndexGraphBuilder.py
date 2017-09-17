@@ -41,10 +41,11 @@ class ndexGraphBuilder:
 
                                                                                  "' in node '" + ext_id + "'")
              if attributes:
-                 for key, value in attributes.iteritems():
+                 for key, value in attributes.items():
                      if n.get(key) and n.get(key) != value:
+                         value_str = str(value)
                          raise RuntimeError("Node attribute " + key + " mismatches between '" +
-                                            n.get(key) + "' and '" + value + "'")
+                                            str(n.get(key)) + "' and '" + value_str + "'")
 
 
         return nodeId
@@ -57,7 +58,11 @@ class ndexGraphBuilder:
             self.ndexGraph.add_edge(src_id, tgt_id, key=id, attr_dict = attributes)
 
         self.edgeIdCounter +=1
+
+        self.ndexGraph.edgemap[id] = (src_id, tgt_id)
+
         return id
+
 
 
 

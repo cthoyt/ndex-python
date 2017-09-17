@@ -147,6 +147,11 @@ def cartesian(G, id):
         for n in G.pos
         ]}]
 
+def cartesian(G):
+    return [{'cartesianLayout': [
+        {'node': n, 'x': float(G.pos[n][0]), 'y': float(G.pos[n][1])}
+        for n in G.pos
+        ]}]
 
 def citations(G):
     citations = []
@@ -205,7 +210,7 @@ def function_terms(G):
 
 def reified_edges(G):
     reified_edges = []
-    for n,re in G.reified_edges.iteritems():
+    for n,re in G.reified_edges.items():
         reified_edges.append(re)
     return [{"reifiedEdges": reified_edges}]
 
