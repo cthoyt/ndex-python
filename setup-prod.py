@@ -72,7 +72,8 @@ if __name__ == '__main__':
             'requests',
             'requests_toolbelt',
             'networkx',
-            'urllib3>=1.16'
+            'urllib3>=1.16',
+            'six',
         ],
     
         include_package_data=True
