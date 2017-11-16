@@ -28,7 +28,7 @@ class MyTestCase(unittest.TestCase):
         self.assertTrue(str(user_drh['firstName']) == 'Doctor')
         self.assertTrue(str(user_drh['lastName']) == 'Horrible')
         self.assertTrue(str(user_drh['userName']) == 'drh')
-        self.assertTrue(str(user_drh['emailAddress']) == 'dexterpratt.bio+drh@gmail.com')
+        self.assertEqual(str(user_drh['emailAddress']), 'dexterpratt.bio+drh@gmail.com')
 
 if __name__ == '__main__':
     unittest.main()
