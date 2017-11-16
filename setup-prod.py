@@ -71,7 +71,7 @@ if __name__ == '__main__':
         install_requires = [
             'requests',
             'requests_toolbelt',
-            'networkx',
+            'networkx==1.11',
             'urllib3>=1.16',
             'six',
         ],

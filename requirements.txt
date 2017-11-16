@@ -1,5 +1,5 @@
 requests
 requests_toolbelt
-networkx
+networkx==1.11
 urllib3
 six
